@@ -1,4 +1,8 @@
+"use client"
 import Image from "next/image";
+import dynamic from 'next/dynamic'
+
+const UploadForm = dynamic(() => import('./components/UploadForm'), { ssr: false })
 
 export default function Home() {
   return (
@@ -33,6 +37,9 @@ export default function Home() {
             </a>{" "}
             center.
           </p>
+        </div>
+        <div className="w-full mt-8">
+          <UploadForm />
         </div>
         <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
           <a
