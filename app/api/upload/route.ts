@@ -5,6 +5,7 @@ import fs from 'fs'
 import { randomUUID } from 'crypto'
 import { connectToDatabase } from '../../../lib/mongoose'
 import Chat from '../../../lib/models/Chat'
+import { indexPDFToPinecone } from '../../../lib/indexers/pinecone'
 
 export const runtime = 'nodejs'
 
@@ -51,6 +52,9 @@ export async function POST(req: Request) {
         console.error('Failed to persist file metadata to Chat in upload route:', err)
       }
     }
+
+    // Start indexing to Pinecone (fire-and-forget). Log but do not block upload response.
+    indexPDFToPinecone(dest, chatId || undefined).catch((err) => console.error('Indexing task failed:', err))
 
     return NextResponse.json({ success: true, id, filename: destName, originalname, size, path: relativePath, chatId }, { status: 201 })
   } catch (err) {
