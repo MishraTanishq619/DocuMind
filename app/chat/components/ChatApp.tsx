@@ -10,6 +10,7 @@ export default function ChatApp() {
   const [chats, setChats] = useState<Array<{ id: string; title: string }>>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [messagesByChat, setMessagesByChat] = useState<Record<string, Array<{ role: 'user'|'assistant'; text: string }>>>({})
+  const [loadingByChat, setLoadingByChat] = useState<Record<string, boolean>>({})
   const [document, setDocument] = useState<{ name: string; url?: string; size?: number } | null>(null)
   const [documentsByChat, setDocumentsByChat] = useState<Record<string, { name: string; url?: string; size?: number } | null>>({})
 
@@ -44,7 +45,7 @@ export default function ChatApp() {
     }
   }, [])
 
-  // when activeChatId changes, set the document to the chat's attached file (if any)
+  // Effect A: update displayed document when active chat or chat metadata changes
   useEffect(() => {
     if (!activeChatId) {
       setDocument(null)
@@ -66,6 +67,34 @@ export default function ChatApp() {
       setDocument(clientDoc)
     }
   }, [activeChatId, chats, documentsByChat])
+
+  // Keep track of which chats we've loaded messages for to avoid refetch loops
+  const loadedMessagesRef = useRef<Record<string, boolean>>({})
+
+  // Effect B: fetch messages for the active chat once when it becomes active
+  useEffect(() => {
+    if (!activeChatId) return
+    if (loadedMessagesRef.current[activeChatId]) return
+
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/chats/${activeChatId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!mounted) return
+        const msgs = (data.messages || []).map((m: any) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', text: m.text }))
+        setMessagesByChat((m) => ({ ...m, [activeChatId]: msgs }))
+        loadedMessagesRef.current[activeChatId] = true
+      } catch (err) {
+        console.error('Failed to load chat messages', err)
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [activeChatId])
 
   const activeChat = chats.find((c) => c.id === activeChatId) as any | undefined
 
@@ -351,12 +380,35 @@ export default function ChatApp() {
             <>
               <ChatWindow
                 messages={messagesByChat[activeChatId] || []}
-                onSend={(text) => {
+                onSend={async (text) => {
+                  // Optimistically add the user message
                   addMessage(activeChatId, 'user', text)
-                  // placeholder assistant reply
-                  setTimeout(() => addMessage(activeChatId, 'assistant', `Echo: ${text}`), 500)
+                  // set loading indicator for this chat
+                  setLoadingByChat((s) => ({ ...s, [activeChatId]: true }))
+
+                  try {
+                    const res = await fetch(`/api/chats/${activeChatId}/messages`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ text }),
+                    })
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({}))
+                      addMessage(activeChatId, 'assistant', `Error: ${err?.error || 'Failed to get response'}`)
+                      return
+                    }
+                    const data = await res.json()
+                    const assistantText = data?.assistant?.text || 'No reply'
+                    addMessage(activeChatId, 'assistant', assistantText)
+                  } catch (err) {
+                    console.error('Send message error', err)
+                    addMessage(activeChatId, 'assistant', 'Error: failed to get assistant reply')
+                  } finally {
+                    setLoadingByChat((s) => ({ ...s, [activeChatId]: false }))
+                  }
                 }}
                 document={document}
+                loading={!!loadingByChat[activeChatId]}
               />
             </>
           ) : (

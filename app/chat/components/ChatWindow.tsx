@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import TypingIndicator from './TypingIndicator'
 
-export default function ChatWindow({ messages, onSend, document }: { messages: Array<{ role: 'user'|'assistant'; text: string }>; onSend: (text: string) => void; document?: { name: string; url?: string; size?: number } | null }) {
+export default function ChatWindow({ messages, onSend, document, loading }: { messages: Array<{ role: 'user'|'assistant'; text: string }>; onSend: (text: string) => void; document?: { name: string; url?: string; size?: number } | null; loading?: boolean }) {
   const [text, setText] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const firstRenderRef = useRef(true)
@@ -31,7 +32,7 @@ export default function ChatWindow({ messages, onSend, document }: { messages: A
     })
 
     return () => cancelAnimationFrame(raf)
-  }, [messages])
+  }, [messages, loading])
 
   // focus input when document present
   useEffect(() => {
@@ -60,6 +61,13 @@ export default function ChatWindow({ messages, onSend, document }: { messages: A
                 </div>
               </div>
             ))}
+            {loading ? (
+              <div className="flex">
+                <div className="max-w-[82%] rounded-2xl px-4 py-3">
+                  <TypingIndicator />
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
