@@ -149,6 +149,49 @@ export default function ChatApp() {
     setDocument(fileMeta)
   }, [activeChatId])
 
+  const onDeleteChat = useCallback(async (chatId: string) => {
+    try {
+      const res = await fetch(`/api/chats/${chatId}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || 'Failed to delete chat')
+      }
+      // Remove chat from local state
+      setChats((prev) => prev.filter((c) => c.id !== chatId))
+      // Clear active chat if it was deleted
+      if (activeChatId === chatId) {
+        setActiveChatId(null)
+        setDocument(null)
+      }
+      // Clean up local state
+      setMessagesByChat((m) => {
+        const newM = { ...m }
+        delete newM[chatId]
+        return newM
+      })
+      setDocumentsByChat((d) => {
+        const newD = { ...d }
+        delete newD[chatId]
+        return newD
+      })
+      setLoadingByChat((l) => {
+        const newL = { ...l }
+        delete newL[chatId]
+        return newL
+      })
+      setIndexingByChat((idx) => {
+        const newIdx = { ...idx }
+        delete newIdx[chatId]
+        return newIdx
+      })
+    } catch (err) {
+      console.error('Failed to delete chat', err)
+      throw err
+    }
+  }, [activeChatId])
+
   const leftRef = useRef<HTMLDivElement | null>(null)
   const rightRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -326,7 +369,7 @@ export default function ChatApp() {
           </div>
 
           <div className="px-2 pb-4 overflow-y-auto flex-1 min-h-0">
-            <ChatList chats={chats} activeId={activeChatId} onSelect={(id) => setActiveChatId(id)} />
+            <ChatList chats={chats} activeId={activeChatId} onSelect={(id) => setActiveChatId(id)} onDelete={onDeleteChat} />
           </div>
         </div>
 
