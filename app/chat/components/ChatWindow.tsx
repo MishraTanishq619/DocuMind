@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import TypingIndicator from './TypingIndicator'
 
-export default function ChatWindow({ messages, onSend, document, loading }: { messages: Array<{ role: 'user'|'assistant'; text: string }>; onSend: (text: string) => void; document?: { name: string; url?: string; size?: number } | null; loading?: boolean }) {
+export default function ChatWindow({ messages, onSend, document, loading, indexing }: { messages: Array<{ role: 'user'|'assistant'; text: string }>; onSend: (text: string) => void; document?: { name: string; url?: string; size?: number } | null; loading?: boolean; indexing?: boolean }) {
   const [text, setText] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const firstRenderRef = useRef(true)
@@ -35,11 +35,11 @@ export default function ChatWindow({ messages, onSend, document, loading }: { me
   }, [messages, loading])
 
   // focus input when document present
-  useEffect(() => {
-    if (document) {
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
-  }, [document])
+  // useEffect(() => {
+  //   if (document) {
+  //     setTimeout(() => inputRef.current?.focus(), 50)
+  //   }
+  // }, [document])
 
   const isEmpty = !messages || messages.length === 0
 
@@ -75,14 +75,14 @@ export default function ChatWindow({ messages, onSend, document, loading }: { me
       <form onSubmit={submit} className="sticky bottom-0 mt-2 flex items-center gap-3 rounded-t-md border-t bg-white p-4">
         <input
           ref={inputRef}
-          className="flex-1 rounded-lg border border-zinc-200 px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+          className="flex-1 rounded-lg border border-zinc-200 px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-zinc-100"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={document ? 'Ask a question about the document...' : 'Select or upload a document to ask questions'}
+          placeholder={indexing ? 'Indexing document...' : document ? 'Ask a question about the document...' : 'Select or upload a document to ask questions'}
           aria-label="Message"
-          disabled={!document}
+          disabled={!document || indexing || loading}
         />
-        <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" aria-label="Send message" disabled={!document}>
+        <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" aria-label="Send message" disabled={!document || indexing || loading}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 rotate-45" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 2L11 13" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M22 2l-7 20  -4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round" opacity="0.2" />

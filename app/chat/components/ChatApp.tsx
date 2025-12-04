@@ -11,6 +11,7 @@ export default function ChatApp() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [messagesByChat, setMessagesByChat] = useState<Record<string, Array<{ role: 'user'|'assistant'; text: string }>>>({})
   const [loadingByChat, setLoadingByChat] = useState<Record<string, boolean>>({})
+  const [indexingByChat, setIndexingByChat] = useState<Record<string, boolean>>({})
   const [document, setDocument] = useState<{ name: string; url?: string; size?: number } | null>(null)
   const [documentsByChat, setDocumentsByChat] = useState<Record<string, { name: string; url?: string; size?: number } | null>>({})
 
@@ -21,6 +22,7 @@ export default function ChatApp() {
     setActiveChatId(id)
     setMessagesByChat((m) => ({ ...m, [id]: [] }))
     setDocumentsByChat((d) => ({ ...d, [id]: null }))
+    setIndexingByChat((idx) => ({ ...idx, [id]: false }))
   }, [chats.length])
 
   // Load chats from server on mount
@@ -121,6 +123,7 @@ export default function ChatApp() {
       setActiveChatId(id)
       setMessagesByChat((m) => ({ ...m, [id]: [] }))
       setDocumentsByChat((d) => ({ ...d, [id]: null }))
+      setIndexingByChat((idx) => ({ ...idx, [id]: false }))
       setShowNewChatModal(false)
       setNewChatTitle('')
     } catch (err) {
@@ -310,8 +313,8 @@ export default function ChatApp() {
         aria-hidden
       />
       <aside ref={leftRef} style={{ width: leftWidth }} className="flex-none flex h-screen flex-col justify-between rounded-l-md bg-[#071226] text-white shadow-lg">
-        <div>
-          <div className="p-4">
+        <div className="flex flex-col min-h-0 flex-1">
+          <div className="p-4 flex-shrink-0">
             <button
               className="flex w-full items-center gap-3 rounded-md bg-[#0b1b33] px-3 py-2 text-sm font-semibold hover:bg-[#0e2640]"
               onClick={() => setShowNewChatModal(true)}
@@ -322,12 +325,12 @@ export default function ChatApp() {
             </button>
           </div>
 
-          <div className="px-2 pb-4">
+          <div className="px-2 pb-4 overflow-y-auto flex-1 min-h-0">
             <ChatList chats={chats} activeId={activeChatId} onSelect={(id) => setActiveChatId(id)} />
           </div>
         </div>
 
-        <div className="px-4 py-3 text-xs text-zinc-400">RAG Document Assistant</div>
+        <div className="px-4 py-3 text-xs text-zinc-400 flex-shrink-0">RAG Document Assistant</div>
       </aside>
 
       <section className="flex-1 flex h-screen flex-col rounded-md bg-white shadow-sm min-w-0">
@@ -355,13 +358,19 @@ export default function ChatApp() {
               const hasFile = !!(activeChat && (activeChat as any).file)
               if (hasFile) return null
               return <DragDropUploader onUploaded={onFileUploaded} onSaved={(data) => {
-                // update local chat entry with returned file metadata
+                // Set indexing state to true when upload completes
                 const cid = data?.chatId || activeChatId
+                setIndexingByChat((idx) => ({ ...idx, [cid]: true }))
+                // update local chat entry with returned file metadata
                 setChats((prev) => prev.map((c) => c.id === cid ? { ...c, file: { id: data.id, filename: data.filename, originalname: data.originalname, size: data.size, path: data.path } } : c))
                 // set document preview from server file
                 const doc = { name: data.originalname ?? 'Document', size: data.size, url: `/api/files/${data.filename}` }
                 setDocument(doc)
                 setDocumentsByChat((d) => ({ ...d, [cid]: doc }))
+                // Simulate indexing delay; in production, poll actual Pinecone indexing status or use webhook
+                setTimeout(() => {
+                  setIndexingByChat((idx) => ({ ...idx, [cid]: false }))
+                }, 3000) // 3s delay to simulate Pinecone indexing
               }} chatId={activeChatId} />
             })()
           ) : (
@@ -409,6 +418,7 @@ export default function ChatApp() {
                 }}
                 document={document}
                 loading={!!loadingByChat[activeChatId]}
+                indexing={!!indexingByChat[activeChatId]}
               />
             </>
           ) : (
@@ -418,26 +428,39 @@ export default function ChatApp() {
       </section>
 
       <aside ref={rightRef} style={{ width: rightWidth }} className="flex-none h-screen overflow-auto rounded-md bg-white p-6 shadow-sm relative">
-        <h3 className="mb-4 text-sm text-black font-semibold">Document Viewer</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm text-black font-semibold">Document Viewer</h3>
+          {activeChatId && !!indexingByChat[activeChatId as string] && (
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+              <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></div>
+              Indexing...
+            </div>
+          )}
+        </div>
         <DocumentViewer document={document} />
       </aside>
 
       {/* New Chat Modal */}
       {showNewChatModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded bg-white p-6 shadow">
-            <h3 className="mb-2 text-lg font-semibold">Create new chat</h3>
-            <p className="mb-4 text-sm text-zinc-600">Give your chat a name</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="mb-2 text-xl font-semibold text-zinc-900">Create new chat</h3>
+            <p className="mb-6 text-sm text-zinc-500">Give your chat a descriptive name</p>
             <input
               autoFocus
               value={newChatTitle}
               onChange={(e) => setNewChatTitle(e.target.value)}
-              className="mb-4 w-full rounded border px-3 py-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newChatTitle.trim() && !creatingChat) {
+                  handleCreateChatFromServer()
+                }
+              }}
+              className="mb-6 w-full rounded-lg border border-zinc-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               placeholder="e.g. Research notes"
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3">
               <button
-                className="rounded px-3 py-2 text-sm"
+                className="rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200 transition-colors cursor-pointer"
                 onClick={() => {
                   setShowNewChatModal(false)
                   setNewChatTitle('')
@@ -446,7 +469,7 @@ export default function ChatApp() {
                 Cancel
               </button>
               <button
-                className="rounded bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all shadow-sm hover:shadow-md active:scale-95"
                 onClick={handleCreateChatFromServer}
                 disabled={creatingChat || !newChatTitle.trim()}
               >
