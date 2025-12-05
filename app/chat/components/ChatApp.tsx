@@ -108,6 +108,10 @@ export default function ChatApp() {
   const [newChatTitle, setNewChatTitle] = useState('')
   const [creatingChat, setCreatingChat] = useState(false)
 
+  // Delete confirmation state
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   async function handleCreateChatFromServer() {
     if (!newChatTitle.trim()) return
     try {
@@ -194,6 +198,19 @@ export default function ChatApp() {
       throw err
     }
   }, [activeChatId])
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteConfirmId) return
+    setDeleting(true)
+    try {
+      await onDeleteChat(deleteConfirmId)
+      setDeleteConfirmId(null)
+    } catch (err) {
+      console.error('Failed to delete chat', err)
+    } finally {
+      setDeleting(false)
+    }
+  }, [deleteConfirmId, onDeleteChat])
 
   const leftRef = useRef<HTMLDivElement | null>(null)
   const rightRef = useRef<HTMLDivElement | null>(null)
@@ -340,7 +357,12 @@ export default function ChatApp() {
   }
 
   return (
-    <div ref={containerRef} className="relative flex w-full items-start h-screen">
+    <div ref={containerRef} className="relative flex w-full items-start h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-900 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
+        <div className="absolute top-10 right-0 h-80 w-80 rounded-full bg-purple-400/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-indigo-400/20 blur-3xl" />
+      </div>
       {/* left handle (absolute) */}
       <div
         onMouseDown={startDragLeft}
@@ -358,7 +380,7 @@ export default function ChatApp() {
         style={{ position: 'absolute', left: `calc(100% - ${rightWidth}px - 4px)`, top: 0, bottom: 0 }}
         aria-hidden
       />
-      <aside ref={leftRef} style={{ width: leftWidth }} className="flex-none flex h-screen flex-col justify-between rounded-l-md bg-[#071226] text-white shadow-lg">
+      <aside ref={leftRef} style={{ width: leftWidth }} className="flex-none flex h-screen flex-col justify-between rounded-l-md bg-white/70 backdrop-blur-xl border border-slate-200/60 shadow-xl">
         <div className="flex flex-col min-h-0 flex-1">
           <div className="p-4 flex-shrink-0 space-y-3">
             <Link href="/" aria-label="Back to landing">
@@ -367,32 +389,41 @@ export default function ChatApp() {
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: 'spring', stiffness: 400 }}
               >
-                <MessageSquare className="w-8 h-8 text-blue-500" />
-                <span className="text-lg text-white">DocuMind</span>
+                <MessageSquare className="w-8 h-8 text-blue-600" />
+                <span className="text-lg text-slate-900">DocuMind</span>
               </motion.div>
             </Link>
             <button
-              className="flex w-full items-center gap-3 rounded-md bg-[#0b1b33] px-3 py-2 text-sm font-semibold hover:bg-[#0e2640]"
+              className="flex w-full items-center gap-3 rounded-md bg-linear-to-r from-blue-600 to-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all"
               onClick={() => setShowNewChatModal(true)}
               aria-label="Create new chat"
             >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-[#12243a] text-xs">+</span>
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-white/20 text-xs">+</span>
               <span>New Chat</span>
             </button>
           </div>
 
           <div className="px-2 pb-4 overflow-y-auto flex-1 min-h-0">
-            <ChatList chats={chats} activeId={activeChatId} onSelect={(id) => setActiveChatId(id)} onDelete={onDeleteChat} />
+            <ChatList 
+              chats={chats} 
+              activeId={activeChatId} 
+              onSelect={(id) => setActiveChatId(id)} 
+              onDelete={onDeleteChat}
+              deleteConfirmId={deleteConfirmId}
+              setDeleteConfirmId={setDeleteConfirmId}
+              deleting={deleting}
+              confirmDelete={confirmDelete}
+            />
           </div>
         </div>
 
-        <div className="px-4 py-3 text-xs text-zinc-400 flex-shrink-0">RAG Document Assistant</div>
+        <div className="px-4 py-3 text-xs text-slate-600 flex-shrink-0">RAG Document Assistant</div>
       </aside>
 
-      <section className="flex-1 flex h-screen flex-col rounded-md bg-white shadow-sm min-w-0">
+      <section className="flex-1 flex h-screen flex-col rounded-md bg-white/80 backdrop-blur-xl border border-slate-200/60 shadow-xl min-w-0 text-slate-900">
         
         {/* Chat title header */}
-        <div className="border-b px-6 py-3">
+        <div className="border-b border-slate-200/70 px-6 py-3">
           {activeChat ? (
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-800 truncate">{activeChat.title}</h2>
@@ -483,7 +514,7 @@ export default function ChatApp() {
         </div>
       </section>
 
-      <aside ref={rightRef} style={{ width: rightWidth }} className="flex-none h-screen overflow-auto rounded-md bg-white p-6 shadow-sm relative">
+      <aside ref={rightRef} style={{ width: rightWidth }} className="flex-none h-screen overflow-auto rounded-md bg-white/80 backdrop-blur-xl border border-slate-200/60 p-6 shadow-xl relative text-slate-900">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm text-black font-semibold">Document Viewer</h3>
           {activeChatId && !!indexingByChat[activeChatId as string] && (
@@ -498,8 +529,8 @@ export default function ChatApp() {
 
       {/* New Chat Modal */}
       {showNewChatModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowNewChatModal(false)}>
+          <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-2 text-xl font-semibold text-zinc-900">Create new chat</h3>
             <p className="mb-6 text-sm text-zinc-500">Give your chat a descriptive name</p>
             <input
@@ -530,6 +561,34 @@ export default function ChatApp() {
                 disabled={creatingChat || !newChatTitle.trim()}
               >
                 {creatingChat ? 'Creating…' : 'Create Chat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Chat Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)}>
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 text-lg font-semibold text-zinc-900">Delete chat?</h3>
+            <p className="mb-6 text-sm text-zinc-600">
+              This will permanently delete the chat, its messages, and any associated documents. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                disabled={deleting}
+                className="flex-1 rounded-md px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="flex-1 rounded-md px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>

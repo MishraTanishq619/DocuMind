@@ -29,14 +29,20 @@ export default function ChatList({
   activeId, 
   onSelect,
   onDelete,
+  deleteConfirmId,
+  setDeleteConfirmId,
+  deleting,
+  confirmDelete,
 }: { 
   chats: Array<{ id: string; title: string }>
   activeId: string | null
   onSelect: (id: string) => void
   onDelete?: (id: string) => Promise<void>
+  deleteConfirmId: string | null
+  setDeleteConfirmId: (id: string | null) => void
+  deleting: boolean
+  confirmDelete: () => Promise<void>
 }) {
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
 
   const colorMap = useMemo(() => {
     const map: Record<string, string> = {}
@@ -46,29 +52,14 @@ export default function ChatList({
     return map
   }, [chats])
 
-  const handleDelete = async (e: React.MouseEvent, chatId: string) => {
+  const handleDelete = (e: React.MouseEvent, chatId: string) => {
     e.stopPropagation()
     setDeleteConfirmId(chatId)
   }
 
-  const confirmDelete = async () => {
-    if (!deleteConfirmId) return
-    setDeleting(true)
-    try {
-      if (onDelete) {
-        await onDelete(deleteConfirmId)
-      }
-    } catch (err) {
-      console.error('Failed to delete chat', err)
-    } finally {
-      setDeleting(false)
-      setDeleteConfirmId(null)
-    }
-  }
-
   return (
     <div className="px-2">
-      {chats.length === 0 && <div className="mt-2 text-sm text-zinc-400">No chats yet</div>}
+      {chats.length === 0 && <div className="mt-2 text-sm text-slate-500">No chats yet</div>}
       <ul className="mt-3 space-y-2">
         {chats.map((c) => (
           <li key={c.id}>
@@ -77,14 +68,14 @@ export default function ChatList({
                 onClick={() => onSelect(c.id)}
                 className={`flex w-full items-center gap-3 truncate rounded-md px-3 py-2 text-left text-sm transition-all ${
                   activeId === c.id
-                    ? `${colorMap[c.id]} border-l-4 bg-[#102737] text-white shadow-lg ring-1 ring-opacity-50`
-                    : `${colorMap[c.id]} border-l-2 text-zinc-200 hover:bg-[#0d1626]`
+                    ? `${colorMap[c.id]} border-l-4 bg-blue-100 text-slate-900 shadow-md ring-1 ring-blue-300 ring-opacity-70`
+                    : `${colorMap[c.id]} border-l-2 text-slate-700 hover:bg-slate-200/50`
                 }`}
                 style={
                   activeId === c.id
                     ? {
                         borderLeftWidth: '4px',
-                        boxShadow: `inset -4px 0 0 rgba(255,255,255,0.1)`,
+                        boxShadow: `inset -4px 0 0 rgba(30, 58, 138, 0.1)`,
                       }
                     : { borderLeftWidth: '2px' }
                 }
@@ -93,7 +84,7 @@ export default function ChatList({
               </button>
               <button
                 onClick={(e) => handleDelete(e, c.id)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center w-6 h-6 rounded hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center w-6 h-6 rounded hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
                 aria-label="Delete chat"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -107,34 +98,6 @@ export default function ChatList({
           </li>
         ))}
       </ul>
-
-      {/* Delete confirmation modal */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="mb-2 text-lg font-semibold text-zinc-900">Delete chat?</h3>
-            <p className="mb-6 text-sm text-zinc-600">
-              This will permanently delete the chat, its messages, and any associated documents. This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                disabled={deleting}
-                className="flex-1 rounded-md px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleting}
-                className="flex-1 rounded-md px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
