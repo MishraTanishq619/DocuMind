@@ -14,7 +14,7 @@ export async function GET(req: Request, context: any) {
     if (!chatId) return NextResponse.json({ error: 'Missing chatId' }, { status: 400 })
 
     await connectToDatabase()
-    const chat = await Chat.findById(chatId).lean()
+    const chat = await Chat.findById(chatId)
     if (!chat) return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
 
     const out = {

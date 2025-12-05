@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect, JSX } from 'react'
 import Link from 'next/link'
 import { MessageSquare } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -15,7 +15,7 @@ export default function ChatApp() {
   const [messagesByChat, setMessagesByChat] = useState<Record<string, Array<{ role: 'user'|'assistant'; text: string }>>>({})
   const [loadingByChat, setLoadingByChat] = useState<Record<string, boolean>>({})
   const [indexingByChat, setIndexingByChat] = useState<Record<string, boolean>>({})
-  const [document, setDocument] = useState<{ name: string; url?: string; size?: number } | null>(null)
+  const [uploadedDocument, setUploadedDocument] = useState<{ name: string; url?: string; size?: number } | null>(null)
   const [documentsByChat, setDocumentsByChat] = useState<Record<string, { name: string; url?: string; size?: number } | null>>({})
 
   const createChat = useCallback((title?: string) => {
@@ -53,7 +53,7 @@ export default function ChatApp() {
   // Effect A: update displayed document when active chat or chat metadata changes
   useEffect(() => {
     if (!activeChatId) {
-      setDocument(null)
+      setUploadedDocument(null)
       return
     }
     const chat = chats.find((c) => c.id === activeChatId)
@@ -64,12 +64,12 @@ export default function ChatApp() {
         size: fileMeta.size,
         url: `/api/files/${fileMeta.filename}`,
       }
-      setDocument(doc)
+      setUploadedDocument(doc)
       setDocumentsByChat((d) => ({ ...d, [activeChatId]: doc }))
     } else {
       // if we have a client-side uploaded preview for this chat, use it
       const clientDoc = documentsByChat[activeChatId] || null
-      setDocument(clientDoc)
+      setUploadedDocument(clientDoc)
     }
   }, [activeChatId, chats, documentsByChat])
 
@@ -152,8 +152,8 @@ export default function ChatApp() {
       return
     }
     setDocumentsByChat((d) => ({ ...d, [activeChatId]: fileMeta }))
-    // keep `document` for backwards compatibility/preview (optional)
-    setDocument(fileMeta)
+    // keep `uploadedDocument` for backwards compatibility/preview (optional)
+    setUploadedDocument(fileMeta)
   }, [activeChatId])
 
   const onDeleteChat = useCallback(async (chatId: string) => {
@@ -170,7 +170,7 @@ export default function ChatApp() {
       // Clear active chat if it was deleted
       if (activeChatId === chatId) {
         setActiveChatId(null)
-        setDocument(null)
+        setUploadedDocument(null)
       }
       // Clean up local state
       setMessagesByChat((m) => {
@@ -452,7 +452,7 @@ export default function ChatApp() {
                 setChats((prev) => prev.map((c) => c.id === cid ? { ...c, file: { id: data.id, filename: data.filename, originalname: data.originalname, size: data.size, path: data.path } } : c))
                 // set document preview from server file
                 const doc = { name: data.originalname ?? 'Document', size: data.size, url: `/api/files/${data.filename}` }
-                setDocument(doc)
+                setUploadedDocument(doc)
                 setDocumentsByChat((d) => ({ ...d, [cid]: doc }))
                 // Simulate indexing delay; in production, poll actual Pinecone indexing status or use webhook
                 setTimeout(() => {
@@ -503,7 +503,7 @@ export default function ChatApp() {
                     setLoadingByChat((s) => ({ ...s, [activeChatId]: false }))
                   }
                 }}
-                document={document}
+                document={uploadedDocument}
                 loading={!!loadingByChat[activeChatId]}
                 indexing={!!indexingByChat[activeChatId]}
               />
@@ -524,7 +524,7 @@ export default function ChatApp() {
             </div>
           )}
         </div>
-        <DocumentViewer document={document} />
+        <DocumentViewer document={uploadedDocument} />
       </aside>
 
       {/* New Chat Modal */}
