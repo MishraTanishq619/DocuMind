@@ -1,6 +1,9 @@
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import Link from 'next/link'
+import { MessageSquare } from 'lucide-react'
+import { motion } from 'motion/react'
 import DragDropUploader from './DragDropUploader'
 import ChatList from './ChatList'
 import ChatWindow from './ChatWindow'
@@ -357,7 +360,17 @@ export default function ChatApp() {
       />
       <aside ref={leftRef} style={{ width: leftWidth }} className="flex-none flex h-screen flex-col justify-between rounded-l-md bg-[#071226] text-white shadow-lg">
         <div className="flex flex-col min-h-0 flex-1">
-          <div className="p-4 flex-shrink-0">
+          <div className="p-4 flex-shrink-0 space-y-3">
+            <Link href="/" aria-label="Back to landing">
+              <motion.div
+                className="flex items-center gap-2 mb-4"
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: 'spring', stiffness: 400 }}
+              >
+                <MessageSquare className="w-8 h-8 text-blue-500" />
+                <span className="text-lg text-white">DocuMind</span>
+              </motion.div>
+            </Link>
             <button
               className="flex w-full items-center gap-3 rounded-md bg-[#0b1b33] px-3 py-2 text-sm font-semibold hover:bg-[#0e2640]"
               onClick={() => setShowNewChatModal(true)}
