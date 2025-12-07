@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import path from 'path'
-import fs from 'fs'
+import { bucket } from '../../../../lib/gcs'
 
 export const runtime = 'nodejs'
 
@@ -14,20 +14,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ filenam
 
     // sanitize filename to prevent path traversal
     const filename = path.basename(filenameRaw)
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'files')
-    const filePath = path.join(uploadsDir, filename)
+    const gcsPath = `uploads/files/${filename}`
+    const file = bucket.file(gcsPath)
+    const [exists] = await file.exists()
 
-    if (!fs.existsSync(filePath)) {
+    if (!exists) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const file = await fs.promises.readFile(filePath)
+    const [fileBuffer] = await file.download()
     const ext = path.extname(filename).toLowerCase()
     const contentType = ext === '.pdf' ? 'application/pdf' : 'application/octet-stream'
 
-    return new NextResponse(file, {
+    return new NextResponse(fileBuffer, {
       status: 200,
-      headers: { 'Content-Type': contentType, 'Content-Length': String(file.length) },
+      headers: { 'Content-Type': contentType, 'Content-Length': String(fileBuffer.length) },
     })
   } catch (err) {
     console.error('files route error', err)

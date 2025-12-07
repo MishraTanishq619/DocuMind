@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectToDatabase } from '../../../../lib/mongoose'
 import Chat from '../../../../lib/models/Chat'
 import { Pinecone } from '@pinecone-database/pinecone'
-import { promises as fsPromises } from 'fs'
-import path from 'path'
+import { bucket } from '../../../../lib/gcs'
 
 export const runtime = 'nodejs'
 
@@ -42,13 +41,16 @@ export async function DELETE(req: Request, context: any) {
     const chat = await Chat.findById(chatId)
     if (!chat) return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
 
-    // If chat has a file, delete it from /uploads/files
+    // If chat has a file, delete it from GCS
     if (chat.file && chat.file.filename) {
       try {
-        const filePath = path.join(process.cwd(), 'uploads', 'files', chat.file.filename)
-        await fsPromises.unlink(filePath)
+        const gcsPath = `uploads/files/${chat.file.filename}`
+        const file = bucket.file(gcsPath)
+        await file.delete().catch((err) => {
+          if (err.code !== 404) throw err
+        })
       } catch (err) {
-        console.error('Failed to delete file from disk', err)
+        console.error('Failed to delete file from GCS', err)
       }
     }
 

@@ -49,8 +49,17 @@ export default function ChatWindow({ messages, onSend, document, loading, indexi
         {isEmpty ? (
           <div className="mx-auto max-w-xl text-center text-zinc-600 p-6">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-2xl font-bold">D</div>
-            <h3 className="mb-2 text-xl font-semibold">Ask your first question about the document</h3>
-            <p className="text-sm">You uploaded a document — type a question below to get answers grounded in its content.</p>
+            {document ? (
+              <>
+                <h3 className="mb-2 text-xl font-semibold">Ask your first question about the document</h3>
+                <p className="text-sm">You uploaded a document — type a question below to get answers grounded in its content.</p>
+              </>
+            ) : (
+              <>
+                <h3 className="mb-2 text-xl font-semibold">Upload a document to get started</h3>
+                <p className="text-sm">Please upload a document to begin chatting.</p>
+              </>
+            )}
           </div>
         ) : (
           <div data-chat-scroll className="absolute inset-0 overflow-y-auto px-6 py-6 space-y-4">

@@ -38,14 +38,15 @@ export async function POST(req: Request, context: any) {
       const ai = new GoogleGenAI({})
 
       // Build contents similar to the snippet: use history and the follow-up question
-      // Note: Gemini API does not support a 'system' role in content items — keep only 'user'/'assistant'.
+      // Note: Gemini API does not support a 'system' role in content items — keep only 'user'/'model'.
+      // user / model || user / assistant
       const contents = [
-        ...history.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'assistant', parts: [{ text: h.text }] })),
+        ...history.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] })),
         { role: 'user', parts: [{ text }] },
       ]
 
       const rewriteResp: any = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: process.env.GEMINI_MODEL_NAME,
         contents,
         config: {
           systemInstruction: `You are a query rewriting expert. Based on the provided chat history, rephrase the "Follow Up user Question" into a complete, standalone question that can be understood without the chat history. Only output the rewritten question and nothing else.`,
@@ -86,10 +87,10 @@ export async function POST(req: Request, context: any) {
       const { GoogleGenAI } = await import('@google/genai')
       const ai = new GoogleGenAI({})
 
-      const historyForModel = [...history.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })), { role: 'user', parts: [{ text: rewritten }] }]
+      const historyForModel = [...history.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] })), { role: 'user', parts: [{ text: rewritten }] }]
 
       const resp: any = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: process.env.GEMINI_MODEL_NAME,
         contents: historyForModel,
         config: {
           systemInstruction: `You have to behave like a Data Structure and Algorithm Expert. You will be given a context of relevant information and a user question. Your task is to answer the user's question based ONLY on the provided context. If the answer is not in the context, you must say "I could not find the answer in the provided document." Keep your answers clear, concise, and educational.\n\nContext: ${retrievedContext}`,
