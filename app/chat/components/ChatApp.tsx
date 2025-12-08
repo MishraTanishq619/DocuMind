@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect, JSX } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { MessageSquare } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -41,6 +41,12 @@ export default function ChatApp() {
         // map to local shape
         const mapped = (data || []).map((c: any) => ({ id: c.id, title: c.title, createdAt: c.createdAt, file: c.file }))
         setChats(mapped)
+        // If there's an `open` query param (from a share), open that chat
+        const sp = searchParams?.get('open')
+        if (sp) {
+          // wait a tick for state to settle then set active
+          setTimeout(() => setActiveChatId(sp), 50)
+        }
       } catch (err) {
         console.error('Failed to load chats', err)
       }
@@ -115,6 +121,11 @@ export default function ChatApp() {
   const [optionsOpen, setOptionsOpen] = useState(false)
   const optionsRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   // close options when clicking outside
   useEffect(() => {
@@ -481,6 +492,31 @@ export default function ChatApp() {
           {activeChat ? (
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-800 truncate">{activeChat.title}</h2>
+              <div className="ml-4 flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    if (!activeChatId) return
+                    try {
+                      setShareLoading(true)
+                      const res = await fetch(`/api/chats/${activeChatId}/share`, { method: 'POST', credentials: 'same-origin' })
+                      if (!res.ok) throw new Error('Failed to create share')
+                      const data = await res.json()
+                      const url = data?.url || ''
+                      setShareUrl(window.location.origin + url)
+                      setShowShareModal(true)
+                    } catch (err) {
+                      console.error('Share failed', err)
+                      // simple fallback alert
+                      alert('Failed to create share link')
+                    } finally {
+                      setShareLoading(false)
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                >
+                  {shareLoading ? 'Sharing…' : 'Share'}
+                </button>
+              </div>
               {activeChat.file ? (
                 <span className="ml-4 inline-flex items-center rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-800">File attached</span>
               ) : null}
@@ -616,6 +652,38 @@ export default function ChatApp() {
               >
                 {creatingChat ? 'Creating…' : 'Create Chat'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Link Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowShareModal(false)}>
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 text-lg font-semibold text-zinc-900">Share chat</h3>
+            <p className="mb-4 text-sm text-zinc-600">Anyone with this link can import a copy of this chat into their account.</p>
+            <div className="flex gap-3">
+              <input className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm" readOnly value={shareUrl || ''} />
+              <button
+                onClick={async () => {
+                  if (!shareUrl) return
+                  try {
+                    await navigator.clipboard.writeText(shareUrl)
+                    // small feedback
+                    alert('Copied link to clipboard')
+                  } catch (err) {
+                    console.error('Copy failed', err)
+                    alert('Failed to copy')
+                  }
+                }}
+                className="rounded-md bg-slate-100 px-3 py-2 text-sm hover:bg-slate-200"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setShowShareModal(false)} className="rounded-md px-3 py-2 text-sm bg-zinc-100 hover:bg-zinc-200">Close</button>
             </div>
           </div>
         </div>
