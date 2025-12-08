@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ filenam
     const ext = path.extname(filename).toLowerCase()
     const contentType = ext === '.pdf' ? 'application/pdf' : 'application/octet-stream'
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(fileBuffer as any, {
       status: 200,
       headers: { 'Content-Type': contentType, 'Content-Length': String(fileBuffer.length) },
     })
