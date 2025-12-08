@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect, JSX } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MessageSquare } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -33,7 +34,7 @@ export default function ChatApp() {
     let mounted = true
     async function loadChats() {
       try {
-        const res = await fetch('/api/chats')
+        const res = await fetch('/api/chats', { credentials: 'same-origin' })
         if (!res.ok) return
         const data = await res.json()
         if (!mounted) return
@@ -84,7 +85,7 @@ export default function ChatApp() {
     let mounted = true
     ;(async () => {
       try {
-        const res = await fetch(`/api/chats/${activeChatId}`)
+        const res = await fetch(`/api/chats/${activeChatId}`, { credentials: 'same-origin' })
         if (!res.ok) return
         const data = await res.json()
         if (!mounted) return
@@ -111,6 +112,20 @@ export default function ChatApp() {
   // Delete confirmation state
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const optionsRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
+
+  // close options when clicking outside
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!optionsRef.current) return
+      if (optionsRef.current.contains(e.target as Node)) return
+      setOptionsOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
 
   async function handleCreateChatFromServer() {
     if (!newChatTitle.trim()) return
@@ -120,6 +135,7 @@ export default function ChatApp() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newChatTitle.trim() }),
+        credentials: 'same-origin',
       })
       if (!res.ok) throw new Error('Failed to create chat')
       const data = await res.json()
@@ -160,6 +176,7 @@ export default function ChatApp() {
     try {
       const res = await fetch(`/api/chats/${chatId}`, {
         method: 'DELETE',
+        credentials: 'same-origin',
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -417,7 +434,44 @@ export default function ChatApp() {
           </div>
         </div>
 
-        <div className="px-4 py-3 text-xs text-slate-600 flex-shrink-0">RAG Document Assistant</div>
+        <div className="px-4 py-3 text-xs text-slate-600 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div>RAG Document Assistant</div>
+            <div className="relative" ref={optionsRef}>
+              <button
+                type="button"
+                onClick={() => setOptionsOpen((s) => !s)}
+                aria-haspopup="true"
+                aria-expanded={optionsOpen}
+                className="inline-flex items-center justify-center rounded-md p-1 hover:bg-slate-100"
+              >
+                <svg className="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                  <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </button>
+
+              {optionsOpen && (
+                <div className="absolute right-0 bottom-10 z-50 w-44 rounded-md bg-white border shadow-lg py-1" role="menu">
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100"
+                    onClick={async () => {
+                      try {
+                        await fetch('/api/auth/logout', { method: 'POST' })
+                      } catch (e) {
+                        // ignore
+                      }
+                      setOptionsOpen(false)
+                      router.push('/auth')
+                    }}
+                    role="menuitem"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </aside>
 
       <section className="flex-1 flex h-screen flex-col rounded-md bg-white/80 backdrop-blur-xl border border-slate-200/60 shadow-xl min-w-0 text-slate-900">

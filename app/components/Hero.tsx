@@ -1,9 +1,14 @@
+"use client"
+
 import { MessageSquare, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { motion } from 'motion/react';
 
 export function Hero() {
+  const router = useRouter()
+
   return (
     <div className="relative overflow-hidden">
       {/* Navigation */}
@@ -27,10 +32,15 @@ export function Hero() {
             <a href="#how-it-works" className="text-slate-600 hover:text-slate-900 transition-colors">How It Works</a>
             <a href="#cta" className="text-slate-600 hover:text-slate-900 transition-colors">Get Started</a>
           </div>
-          <motion.button 
+          <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => {
+              router.push('/auth')
+            }}
+            type="button"
+            aria-label="Sign in"
           >
             Sign In
           </motion.button>
