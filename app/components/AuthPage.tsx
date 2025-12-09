@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Lock, Mail, Github, Linkedin, Facebook } from 'lucide-react';
@@ -9,6 +10,8 @@ export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const nextParam = searchParams?.get('next') || null
 
   const [formData, setFormData] = useState({
     username: '',
@@ -43,8 +46,8 @@ export function AuthPage() {
           throw new Error(body?.error || 'Registration failed')
         }
 
-        // Server sets httpOnly cookie on success, just redirect
-        router.push('/chat')
+        // Server sets httpOnly cookie on success, redirect to `next` if provided
+        router.push(nextParam || '/chat')
       } else {
         // Login
         const res = await fetch('/api/auth/login', {
@@ -58,8 +61,8 @@ export function AuthPage() {
           throw new Error(body?.error || 'Login failed')
         }
 
-        // Server sets httpOnly cookie on success, just redirect
-        router.push('/chat')
+        // Server sets httpOnly cookie on success, redirect to `next` if provided
+        router.push(nextParam || '/chat')
       }
     } catch (err: any) {
       setError(err?.message || 'Request failed')
