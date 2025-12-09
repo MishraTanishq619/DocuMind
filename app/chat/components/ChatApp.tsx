@@ -10,6 +10,7 @@ import DragDropUploader from './DragDropUploader'
 import ChatList from './ChatList'
 import ChatWindow from './ChatWindow'
 import DocumentViewer from './DocumentViewer'
+import { exportChatToPDF } from '../../../lib/exportToPDF'
 
 export default function ChatApp() {
   const [chats, setChats] = useState<Array<{ id: string; title: string }>>([])
@@ -127,6 +128,7 @@ export default function ChatApp() {
   const [shareLoading, setShareLoading] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
 
   // close options when clicking outside
   useEffect(() => {
@@ -515,6 +517,30 @@ export default function ChatApp() {
                   className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
                 >
                   {shareLoading ? 'Sharing…' : 'Share'}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!activeChatId) return
+                    try {
+                      setExportLoading(true)
+                      const res = await fetch(`/api/chats/${activeChatId}`, { credentials: 'same-origin' })
+                      if (!res.ok) throw new Error('Failed to fetch chat')
+                      const data = await res.json()
+                      const messages = (data.messages || []).map((m: any) => ({ role: m.role, text: m.text }))
+                      await exportChatToPDF(data.title, messages, data.createdAt)
+                      toast.success('Chat exported as PDF')
+                    } catch (err) {
+                      console.error('Export failed', err)
+                      const errorMsg = err instanceof Error ? err.message : 'Failed to export chat'
+                      toast.error(errorMsg)
+                    } finally {
+                      setExportLoading(false)
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                  disabled={exportLoading}
+                >
+                  {exportLoading ? 'Exporting…' : 'Export'}
                 </button>
               </div>
               {activeChat.file ? (

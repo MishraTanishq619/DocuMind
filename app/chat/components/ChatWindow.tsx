@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import TypingIndicator from './TypingIndicator'
+import MarkdownMessage from './MarkdownMessage'
 
 export default function ChatWindow({ messages, onSend, document, loading, indexing }: { messages: Array<{ role: 'user'|'assistant'; text: string }>; onSend: (text: string) => void; document?: { name: string; url?: string; size?: number } | null; loading?: boolean; indexing?: boolean }) {
   const [text, setText] = useState('')
@@ -66,7 +67,13 @@ export default function ChatWindow({ messages, onSend, document, loading, indexi
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[82%] rounded-2xl px-5 py-3 shadow-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white text-zinc-800 border'} `}>
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</div>
+                  {m.role === 'assistant' ? (
+                    <div className="text-sm">
+                      <MarkdownMessage content={m.text} />
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</div>
+                  )}
                 </div>
               </div>
             ))}
