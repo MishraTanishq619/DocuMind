@@ -81,33 +81,65 @@ export async function POST(req: Request, context: any) {
     const matches = (queryResp?.matches || queryResp?.matches || [])
     const retrievedContext = matches.map((m: any) => m.metadata?.text || m.metadata?.content || '').filter(Boolean).join('\n\n---\n\n')
 
-    // 3) Ask Gemini to answer using ONLY the provided context
-    let assistantText = ''
-    try {
-      const { GoogleGenAI } = await import('@google/genai')
-      const ai = new GoogleGenAI({})
+    // 3) Stream the response from Gemini
+    const { GoogleGenAI } = await import('@google/genai')
+    const ai = new GoogleGenAI({})
 
-      const historyForModel = [...history.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] })), { role: 'user', parts: [{ text: rewritten }] }]
+    const historyForModel = [...history.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] })), { role: 'user', parts: [{ text: rewritten }] }]
 
-      const resp: any = await ai.models.generateContent({
-        model: process.env.GEMINI_MODEL_NAME,
-        contents: historyForModel,
-        config: {
-          systemInstruction: `You have to behave like a Data Structure and Algorithm Expert. You will be given a context of relevant information and a user question. Your task is to answer the user's question based ONLY on the provided context. If the answer is not in the context, you must say "I could not find the answer in the provided document." Keep your answers clear, concise, and educational.\n\nContext: ${retrievedContext}`,
-        },
-      })
+    const encoder = new TextEncoder()
+    let fullText = ''
 
-      assistantText = resp.outputText || resp.text || resp?.candidates?.[0]?.content?.[0]?.text || ''
-    } catch (err) {
-      console.error('Model generation failed:', err)
-      assistantText = 'Model generation failed.'
-    }
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const result = await ai.models.generateContentStream({
+            model: process.env.GEMINI_MODEL_NAME,
+            contents: historyForModel,
+            config: {
+              systemInstruction: `You have to behave like a Data Structure and Algorithm Expert. You will be given a context of relevant information and a user question. Your task is to answer the user's question based ONLY on the provided context. If the answer is not in the context, you must say "I could not find the answer in the provided document." Keep your answers clear, concise, and educational.\n\nContext: ${retrievedContext}`,
+            },
+          })
 
-    // Save assistant reply
-    const assistantMessage = { role: 'assistant', text: assistantText, createdAt: new Date() }
-    await Chat.findByIdAndUpdate(chatId, { $push: { messages: assistantMessage } })
+          // Try to access the stream in different ways the API might provide it
+          const responseStream = result.stream || result[Symbol.asyncIterator] ? result : null
+          
+          if (!responseStream) {
+            throw new Error('No stream available from Gemini API')
+          }
 
-    return NextResponse.json({ success: true, user: userMessage, assistant: assistantMessage })
+          for await (const chunk of responseStream) {
+            const text = chunk.text || chunk.outputText || chunk?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+            if (text) {
+              fullText += text
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+              // Add a small delay for a more natural typing effect
+              await new Promise(resolve => setTimeout(resolve, 20))
+            }
+          }
+
+          // Save the complete assistant message to DB
+          const assistantMessage = { role: 'assistant', text: fullText, createdAt: new Date() }
+          await Chat.findByIdAndUpdate(chatId, { $push: { messages: assistantMessage } })
+
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+          controller.close()
+        } catch (err) {
+          console.error('Streaming generation failed:', err)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Model generation failed' })}\n\n`))
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+          controller.close()
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    })
   } catch (err) {
     console.error('messages route error', err)
     return NextResponse.json({ error: 'Message processing failed' }, { status: 500 })

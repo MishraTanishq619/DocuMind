@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { MessageSquare } from 'lucide-react'
 import { motion } from 'motion/react'
+import { toast } from 'sonner'
 import DragDropUploader from './DragDropUploader'
 import ChatList from './ChatList'
 import ChatWindow from './ChatWindow'
@@ -506,8 +507,7 @@ export default function ChatApp() {
                       setShowShareModal(true)
                     } catch (err) {
                       console.error('Share failed', err)
-                      // simple fallback alert
-                      alert('Failed to create share link')
+                      toast.error('Failed to create share link')
                     } finally {
                       setShareLoading(false)
                     }
@@ -583,9 +583,62 @@ export default function ChatApp() {
                       addMessage(activeChatId, 'assistant', `Error: ${err?.error || 'Failed to get response'}`)
                       return
                     }
-                    const data = await res.json()
-                    const assistantText = data?.assistant?.text || 'No reply'
-                    addMessage(activeChatId, 'assistant', assistantText)
+
+                    if (!res.body) {
+                      addMessage(activeChatId, 'assistant', 'Error: No response body')
+                      return
+                    }
+
+                    // Create placeholder message for streaming
+                    addMessage(activeChatId, 'assistant', '')
+
+                    // Read the SSE stream
+                    const reader = res.body.getReader()
+                    const decoder = new TextDecoder()
+                    let accumulatedText = ''
+
+                    while (true) {
+                      const { done, value } = await reader.read()
+                      if (done) break
+
+                      const chunk = decoder.decode(value)
+                      const lines = chunk.split('\n')
+
+                      for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                          const data = line.slice(6)
+                          if (data === '[DONE]') {
+                            break
+                          }
+                          try {
+                            const parsed = JSON.parse(data)
+                            if (parsed.error) {
+                              addMessage(activeChatId, 'assistant', `Error: ${parsed.error}`)
+                              return
+                            }
+                            if (parsed.text) {
+                              accumulatedText += parsed.text
+                              // Update the last assistant message
+                              setMessagesByChat((prev) => {
+                                const messages = prev[activeChatId] || []
+                                if (messages.length === 0) return prev
+                                const lastMsg = messages[messages.length - 1]
+                                if (lastMsg.role !== 'assistant') return prev
+                                return {
+                                  ...prev,
+                                  [activeChatId]: [
+                                    ...messages.slice(0, -1),
+                                    { ...lastMsg, text: accumulatedText },
+                                  ],
+                                }
+                              })
+                            }
+                          } catch (e) {
+                            console.error('Failed to parse SSE data:', e)
+                          }
+                        }
+                      }
+                    }
                   } catch (err) {
                     console.error('Send message error', err)
                     addMessage(activeChatId, 'assistant', 'Error: failed to get assistant reply')
@@ -670,11 +723,10 @@ export default function ChatApp() {
                   if (!shareUrl) return
                   try {
                     await navigator.clipboard.writeText(shareUrl)
-                    // small feedback
-                    alert('Copied link to clipboard')
+                    toast.success('Copied link to clipboard')
                   } catch (err) {
                     console.error('Copy failed', err)
-                    alert('Failed to copy')
+                    toast.error('Failed to copy')
                   }
                 }}
                 className="rounded-md bg-slate-100 px-3 py-2 text-sm hover:bg-slate-200"
