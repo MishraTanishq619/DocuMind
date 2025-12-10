@@ -16,8 +16,8 @@ export default function App() {
       <Hero />
       <Features />
       <InterfaceShowcase />
-      <TechStack />
       <HowItWorks />
+      <TechStack />
       <UnderTheHood />
       <CTA />
       <Footer />
