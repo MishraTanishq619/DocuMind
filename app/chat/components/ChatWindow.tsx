@@ -6,15 +6,66 @@ import MarkdownMessage from './MarkdownMessage'
 
 export default function ChatWindow({ messages, onSend, document, loading, indexing }: { messages: Array<{ role: 'user'|'assistant'; text: string }>; onSend: (text: string) => void; document?: { name: string; url?: string; size?: number } | null; loading?: boolean; indexing?: boolean }) {
   const [text, setText] = useState('')
+  const [listening, setListening] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const firstRenderRef = useRef(true)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const textRef = useRef('')
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   function submit(e?: React.FormEvent) {
     e?.preventDefault()
     if (!text.trim()) return
     onSend(text.trim())
     setText('')
+    textRef.current = ''
+  }
+
+  function startVoice() {
+    if (listening) return
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      console.warn('Speech recognition not supported in this browser')
+      return
+    }
+
+    const recognition: SpeechRecognition = new SpeechRecognition()
+    recognition.lang = 'en-US'
+    recognition.continuous = false
+    recognition.interimResults = true
+
+    recognition.onstart = () => setListening(true)
+    recognition.onerror = () => setListening(false)
+    recognition.onend = () => setListening(false)
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalText = ''
+      let interimText = ''
+
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const res = event.results[i]
+        const chunk = res[0].transcript.trim()
+        if (!chunk) continue
+        if (res.isFinal) {
+          finalText += (finalText ? ' ' : '') + chunk
+        } else {
+          interimText += (interimText ? ' ' : '') + chunk
+        }
+      }
+
+      const base = textRef.current || ''
+      const committed = finalText ? (base ? `${base} ${finalText}` : finalText) : base
+      textRef.current = committed
+      const displayVal = interimText ? `${committed} ${interimText}`.trim() : committed
+      setText(displayVal)
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+  }
+
+  function stopVoice() {
+    recognitionRef.current?.stop()
+    setListening(false)
   }
 
   // Scroll behavior: scroll to bottom after messages change.
@@ -93,11 +144,23 @@ export default function ChatWindow({ messages, onSend, document, loading, indexi
           ref={inputRef}
           className="flex-1 rounded-lg border border-zinc-200 px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-zinc-100"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value)
+            textRef.current = e.target.value
+          }}
           placeholder={indexing ? 'Indexing document...' : document ? 'Ask a question about the document...' : 'Select or upload a document to ask questions'}
           aria-label="Message"
           disabled={!document || indexing || loading}
         />
+        <button
+          type="button"
+          onClick={listening ? stopVoice : startVoice}
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium border ${listening ? 'border-green-500 text-green-600' : 'border-slate-200 text-slate-700'} hover:bg-slate-50 disabled:opacity-50`}
+          aria-label="Voice input"
+          disabled={!document || indexing || loading}
+        >
+          {listening ? 'Listening…' : 'Voice'}
+        </button>
         <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" aria-label="Send message" disabled={!document || indexing || loading}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 rotate-45" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 2L11 13" strokeLinecap="round" strokeLinejoin="round" />
