@@ -3,6 +3,7 @@ import { AuthPage } from '../components/AuthPage';
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { motion } from 'motion/react'
+import { Suspense } from 'react'
 
 export default function App() {
   const router = useRouter()
@@ -24,7 +25,9 @@ export default function App() {
         Back
       </motion.button>
 
-      <AuthPage />
+      <Suspense fallback={<div className="text-center">Loading...</div>}>
+        <AuthPage />
+      </Suspense>
     </div>
   );
 }

@@ -102,14 +102,14 @@ export async function POST(req: Request, context: any) {
           })
 
           // Try to access the stream in different ways the API might provide it
-          const responseStream = result.stream || result[Symbol.asyncIterator] ? result : null
+          const responseStream = result[Symbol.asyncIterator] ? result : null
           
           if (!responseStream) {
             throw new Error('No stream available from Gemini API')
           }
 
           for await (const chunk of responseStream) {
-            const text = chunk.text || chunk.outputText || chunk?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+            const text = chunk.text || chunk?.candidates?.[0]?.content?.parts?.[0]?.text || ''
             if (text) {
               fullText += text
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
