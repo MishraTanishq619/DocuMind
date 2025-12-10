@@ -4,6 +4,53 @@ import React, { useEffect, useRef, useState } from 'react'
 import TypingIndicator from './TypingIndicator'
 import MarkdownMessage from './MarkdownMessage'
 
+// Web Speech API type definitions
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition
+    webkitSpeechRecognition: typeof SpeechRecognition
+  }
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number
+  results: SpeechRecognitionResultList
+}
+
+interface SpeechRecognitionResultList {
+  length: number
+  [index: number]: SpeechRecognitionResult
+}
+
+interface SpeechRecognitionResult {
+  length: number
+  isFinal: boolean
+  [index: number]: SpeechRecognitionAlternative
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string
+  confidence: number
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  abort(): void
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null
+  onerror: ((this: SpeechRecognition, ev: Event) => any) | null
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null
+}
+
+declare const SpeechRecognition: {
+  prototype: SpeechRecognition
+  new (): SpeechRecognition
+}
+
 export default function ChatWindow({ messages, onSend, document, loading, indexing }: { messages: Array<{ role: 'user'|'assistant'; text: string }>; onSend: (text: string) => void; document?: { name: string; url?: string; size?: number } | null; loading?: boolean; indexing?: boolean }) {
   const [text, setText] = useState('')
   const [listening, setListening] = useState(false)
