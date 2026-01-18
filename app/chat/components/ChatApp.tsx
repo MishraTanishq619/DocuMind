@@ -476,6 +476,7 @@ export default function ChatApp() {
                       }
                       setOptionsOpen(false)
                       router.push('/auth')
+                      window.location.reload()
                     }}
                     role="menuitem"
                   >
