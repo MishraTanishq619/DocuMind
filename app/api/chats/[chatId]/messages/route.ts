@@ -65,7 +65,7 @@ export async function POST(req: Request, context: any) {
     const { GoogleGenerativeAIEmbeddings } = await import('@langchain/google-genai')
     const { Pinecone } = await import('@pinecone-database/pinecone')
 
-    const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY, model: 'text-embedding-004' })
+    const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY, model: 'gemini-embedding-001' })
     const qVec = await embeddings.embedQuery(rewritten)
 
     // Initialize Pinecone client (it reads env vars automatically)

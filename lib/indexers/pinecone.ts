@@ -15,11 +15,26 @@ export async function indexPDFToPinecone(filePath: string, namespace?: string) {
     // Load and split the PDF
     const loader = new PDFLoader(filePath)
     const rawDocs = await loader.load()
+    console.log(`Loaded ${rawDocs.length} raw documents from PDF`)
+    
     const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 })
     const docs = await splitter.splitDocuments(rawDocs)
+    console.log(`Split into ${docs.length} document chunks`)
+
+    if (docs.length === 0) {
+      console.error('No documents to index - PDF may be empty or unreadable')
+      return
+    }
 
     // Embeddings
-    const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY, model: 'text-embedding-004' })
+    const embeddings = new GoogleGenerativeAIEmbeddings({ 
+      apiKey: process.env.GEMINI_API_KEY, 
+      model: 'models/gemini-embedding-001'
+    })
+    
+    // Test embedding generation
+    const testEmbed = await embeddings.embedQuery('test')
+    console.log(`Embedding dimension: ${testEmbed.length}`)
 
     // Pinecone client and index
     const pinecone = new Pinecone()
